@@ -1,81 +1,92 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BioAssist AI</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
-        #chatbox {
-            border: 1px solid #ccc;
-            padding: 15px;
+
+        .container {
+            width: 600px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        #chat-box {
             height: 400px;
             overflow-y: auto;
-            margin-bottom: 15px;
-        }
-        .user {
-            color: blue;
+            border: 1px solid #ddd;
+            padding: 10px;
             margin-bottom: 10px;
         }
+
+        .user {
+            color: blue;
+        }
+
         .bot {
             color: green;
-            margin-bottom: 15px;
         }
-        #userInput {
-            width: 75%;
+
+        input {
+            width: 80%;
             padding: 10px;
         }
-        #sendBtn {
-            padding: 10px 15px;
+
+        button {
+            padding: 10px;
+            background: black;
+            color: white;
+            border: none;
         }
     </style>
 </head>
+
 <body>
-    <h1>BioAssist AI</h1>
+<div class="container">
+    <h1>🧠 BioAssist AI</h1>
 
-    <div id="chatbox"></div>
+    <div id="chat-box"></div>
 
-    <input type="text" id="userInput" placeholder="Ask a question...">
-    <button id="sendBtn">Send</button>
+    <input type="text" id="question" placeholder="Ask a medical question...">
+    <button onclick="sendMessage()">Send</button>
+</div>
 
-    <script>
-        const sendBtn = document.getElementById("sendBtn");
-        const userInput = document.getElementById("userInput");
-        const chatbox = document.getElementById("chatbox");
+<script>
+function sendMessage() {
+    let input = document.getElementById("question");
+    let chatBox = document.getElementById("chat-box");
 
-        function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message) return;
+    let question = input.value;
 
-            chatbox.innerHTML += `<div class="user"><b>You:</b> ${message}</div>`;
+    chatBox.innerHTML += `<p class="user"><b>You:</b> ${question}</p>`;
 
-            fetch("/get", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                body: "msg=" + encodeURIComponent(message)
-            })
-            .then(response => response.text())
-            .then(data => {
-                chatbox.innerHTML += `<div class="bot"><b>Bot:</b> ${data}</div>`;
-                chatbox.scrollTop = chatbox.scrollHeight;
-            });
+    fetch("/get", {
+        method: "POST",
+        body: JSON.stringify({msg: question}),
+        headers: {"Content-Type": "application/json"}
+    })
+    .then(res => res.json())
+    .then(data => {
+        chatBox.innerHTML += `<p class="bot"><b>Bot:</b> ${data.response}</p>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
 
-            userInput.value = "";
-        }
+    input.value = "";
+}
+</script>
 
-        sendBtn.addEventListener("click", sendMessage);
-        userInput.addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
-        });
-    </script>
 </body>
 </html>
