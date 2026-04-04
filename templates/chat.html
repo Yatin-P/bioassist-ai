@@ -1,92 +1,571 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BioAssist AI</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
+            margin: 0;
             font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
+            background: linear-gradient(135deg, #dbeafe, #f5d0fe, #fae8ff);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            padding: 24px;
         }
 
-        .container {
-            width: 600px;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+        .app-container {
+            width: 100%;
+            max-width: 1100px;
+            height: 90vh;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+            display: flex;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
-        h1 {
-            text-align: center;
-        }
-
-        #chat-box {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-
-        .user {
-            color: blue;
-        }
-
-        .bot {
-            color: green;
-        }
-
-        input {
-            width: 80%;
-            padding: 10px;
-        }
-
-        button {
-            padding: 10px;
-            background: black;
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #1e293b, #0f172a);
             color: white;
+            padding: 24px 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .brand h2 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .brand p {
+            margin-top: 10px;
+            color: #cbd5e1;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+
+        .sidebar-card {
+            margin-top: 22px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .sidebar-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #f8fafc;
+        }
+
+        .sidebar-card p {
+            margin: 0;
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .sidebar-footer {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8fafc;
+        }
+
+        .header {
+            padding: 20px 24px;
+            background: linear-gradient(135deg, #2563eb, #9333ea);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .header-left h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+
+        .header-left p {
+            margin: 6px 0 0;
+            font-size: 14px;
+            opacity: 0.95;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
             border: none;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.16);
+            color: white;
+            transition: 0.2s ease;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.24);
+        }
+
+        #chatbox {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 18px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .bubble {
+            max-width: 78%;
+            padding: 16px 18px;
+            border-radius: 20px;
+            line-height: 1.6;
+            font-size: 15px;
+            word-wrap: break-word;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+        }
+
+        .user .bubble {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .bot .bubble {
+            background: white;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            border-bottom-left-radius: 6px;
+        }
+
+        .label {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .typing {
+            display: inline-block;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+        }
+
+        .input-area {
+            display: flex;
+            gap: 12px;
+            padding: 18px 20px;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            font-size: 15px;
+            outline: none;
+            transition: 0.2s ease;
+        }
+
+        #userInput:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        #sendBtn {
+            border: none;
+            border-radius: 14px;
+            padding: 0 22px;
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            background: linear-gradient(135deg, #2563eb, #9333ea);
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        #sendBtn:hover {
+            transform: translateY(-1px);
+            opacity: 0.96;
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .bot-content {
+            white-space: normal;
+        }
+
+        .bot-section-title {
+            font-weight: 700;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            color: #111827;
+        }
+
+        .bot-paragraph {
+            margin: 0 0 8px 0;
+        }
+
+        .bot-list {
+            margin: 6px 0 10px 18px;
+            padding: 0;
+        }
+
+        .bot-list li {
+            margin-bottom: 6px;
+        }
+
+        .sources-box {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: #f8fafc;
+            border: 1px solid #dbeafe;
+        }
+
+        .sources-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #1d4ed8;
+        }
+
+        .source-chip {
+            display: inline-block;
+            margin: 4px 6px 0 0;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #e0e7ff;
+            color: #3730a3;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+            .app-container {
+                flex-direction: column;
+                height: 94vh;
+            }
+
+            .sidebar {
+                width: 100%;
+                padding: 18px;
+                gap: 14px;
+            }
+
+            .main {
+                min-height: 0;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .header-btn {
+                width: 100%;
+            }
+
+            .bubble {
+                max-width: 92%;
+            }
         }
     </style>
 </head>
-
 <body>
-<div class="container">
-    <h1>🧠 BioAssist AI</h1>
+    <div class="app-container">
+        <div class="sidebar">
+            <div>
+                <div class="brand">
+                    <h2>🧠 BioAssist AI</h2>
+                    <p>
+                        A medical document assistant that uses Pinecone retrieval and OpenAI responses
+                        to answer questions from your indexed PDF collection.
+                    </p>
+                </div>
 
-    <div id="chat-box"></div>
+                <div class="sidebar-card">
+                    <h4>How to use</h4>
+                    <p>Ask questions about anatomy, physiology, medical concepts, or follow up on previous answers.</p>
+                </div>
 
-    <input type="text" id="question" placeholder="Ask a medical question...">
-    <button onclick="sendMessage()">Send</button>
-</div>
+                <div class="sidebar-card">
+                    <h4>Example questions</h4>
+                    <p>
+                        What is physiology?<br>
+                        How is it different from anatomy?<br>
+                        Why is homeostasis important?
+                    </p>
+                </div>
+            </div>
 
-<script>
-function sendMessage() {
-    let input = document.getElementById("question");
-    let chatBox = document.getElementById("chat-box");
+            <div class="sidebar-footer">
+                Built with Flask, Pinecone, Hugging Face, and OpenAI
+            </div>
+        </div>
 
-    let question = input.value;
+        <div class="main">
+            <div class="header">
+                <div class="header-left">
+                    <h1>Medical Chat Assistant</h1>
+                    <p>ChatGPT-style medical document assistant</p>
+                </div>
+                <div class="header-actions">
+                    <button class="header-btn" onclick="clearChat()">Clear Chat</button>
+                </div>
+            </div>
 
-    chatBox.innerHTML += `<p class="user"><b>You:</b> ${question}</p>`;
+            <div id="chatbox">
+                <div class="message bot">
+                    <div class="bubble">
+                        <div class="label">Bot</div>
+                        <div class="bot-content">
+                            <p class="bot-paragraph">Hi! Ask me anything from your indexed medical documents.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Ask a medical question...">
+                <button id="sendBtn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sendBtn = document.getElementById("sendBtn");
+        const userInput = document.getElementById("userInput");
+        const chatbox = document.getElementById("chatbox");
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatBotResponse(text) {
+            const safeText = escapeHtml(text);
+
+            const parts = safeText.split(/\n\s*---\s*\nSources used:\s*/);
+            const mainText = parts[0];
+            const sourcesText = parts[1] || "";
+
+            const lines = mainText.split("\n").map(line => line.trim()).filter(line => line !== "");
+            let html = "";
+            let inList = false;
+
+            for (const line of lines) {
+                const isSection =
+                    line.startsWith("Definition:") ||
+                    line.startsWith("Explanation:") ||
+                    line.startsWith("Key Points:") ||
+                    line.startsWith("Overview:") ||
+                    line.startsWith("How It Works:") ||
+                    line.startsWith("Answer:") ||
+                    line.startsWith("Why It Matters:") ||
+                    line.startsWith("Important Details:") ||
+                    line.startsWith("Main Differences:");
+
+                const isBullet = line.startsWith("- ");
+
+                if (isSection) {
+                    if (inList) {
+                        html += "</ul>";
+                        inList = false;
+                    }
+                    html += `<div class="bot-section-title">${line}</div>`;
+                } else if (isBullet) {
+                    if (!inList) {
+                        html += `<ul class="bot-list">`;
+                        inList = true;
+                    }
+                    html += `<li>${line.substring(2)}</li>`;
+                } else {
+                    if (inList) {
+                        html += "</ul>";
+                        inList = false;
+                    }
+                    html += `<p class="bot-paragraph">${line}</p>`;
+                }
+            }
+
+            if (inList) {
+                html += "</ul>";
+            }
+
+            if (sourcesText) {
+                const sourceItems = sourcesText
+                    .split(",")
+                    .map(item => item.trim())
+                    .filter(item => item !== "");
+
+                if (sourceItems.length > 0) {
+                    html += `<div class="sources-box"><div class="sources-title">Sources used</div>`;
+                    sourceItems.forEach(source => {
+                        html += `<span class="source-chip">${source}</span>`;
+                    });
+                    html += `</div>`;
+                }
+            }
+
+            return html;
+        }
+
+        function addMessage(role, text) {
+            const wrapper = document.createElement("div");
+            wrapper.className = `message ${role}`;
+
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+
+            const label = document.createElement("div");
+            label.className = "label";
+            label.textContent = role === "user" ? "You" : "Bot";
+
+            bubble.appendChild(label);
+
+            if (role === "bot") {
+                const content = document.createElement("div");
+                content.className = "bot-content";
+                content.innerHTML = formatBotResponse(text);
+                bubble.appendChild(content);
+            } else {
+                const content = document.createElement("div");
+                content.textContent = text;
+                bubble.appendChild(content);
+            }
+
+            wrapper.appendChild(bubble);
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function addTyping() {
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot";
+            wrapper.id = "typingIndicator";
+
+            const typing = document.createElement("div");
+            typing.className = "typing";
+            typing.textContent = "Bot is typing...";
+
+            wrapper.appendChild(typing);
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function removeTyping() {
+            const typing = document.getElementById("typingIndicator");
+            if (typing) typing.remove();
+        }
+
+        function clearChat() {
+            fetch("/clear", { method: "POST" })
+                .then(() => {
+                    chatbox.innerHTML = `
+                        <div class="message bot">
+                            <div class="bubble">
+                                <div class="label">Bot</div>
+                                <div class="bot-content">
+                                    <p class="bot-paragraph">Chat cleared. Ask me a new medical question anytime.</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+
+
+    function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+
+    addMessage("user", message);
+    userInput.value = "";
+    sendBtn.disabled = true;
+    addTyping();
 
     fetch("/get", {
         method: "POST",
-        body: JSON.stringify({msg: question}),
-        headers: {"Content-Type": "application/json"}
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "msg=" + encodeURIComponent(message)
     })
-    .then(res => res.json())
+    .then(response => response.text())
     .then(data => {
-        chatBox.innerHTML += `<p class="bot"><b>Bot:</b> ${data.response}</p>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
+        removeTyping();
+        addMessage("bot", data);
+    })
+    .catch(() => {
+        removeTyping();
+        addMessage("bot", "Something went wrong while getting the response.");
+    })
+    .finally(() => {
+        sendBtn.disabled = false;
+        userInput.focus();
     });
-
-    input.value = "";
 }
-</script>
 
+        sendBtn.addEventListener("click", sendMessage);
+        userInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        });
+    </script>
 </body>
 </html>
