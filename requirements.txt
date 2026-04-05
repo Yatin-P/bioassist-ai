@@ -5,6 +5,9 @@ pinecone
 langchain==0.1.16
 langchain-community==0.0.32
 langchain-openai==0.0.8
+langchain-pinecone
+langchain-huggingface
+sentence-transformers
 python-dotenv
 tiktoken
 pypdf
