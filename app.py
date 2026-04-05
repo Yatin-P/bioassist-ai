@@ -3,10 +3,7 @@ from dotenv import load_dotenv
 import os
 
 from pinecone import Pinecone
-from pinecone import Pinecone
 from langchain_openai import OpenAIEmbeddings
-
-embeddings = OpenAIEmbeddings()
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -18,22 +15,15 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+client = OpenAI(api_key=OPENAI_API_KEY)
+embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
-
-vectorstore = PineconeVectorStore(
-    index_name=INDEX_NAME,
-    embedding=embeddings
-)
-
-retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
+index = pc.Index(INDEX_NAME)
 
 
 @app.route("/")
-def index():
+def index_page():
     if "chat_history" not in session:
         session["chat_history"] = []
     if "current_topic" not in session:
@@ -45,10 +35,6 @@ def index():
 def stream_chat():
     user_message = request.form["msg"]
 
-    # Fresh OpenAI client per request
-    client = OpenAI(api_key=OPENAI_API_KEY)
-
-    # Session memory
     chat_history = session.get("chat_history", [])
     current_topic = session.get("current_topic", "")
 
@@ -57,7 +43,6 @@ def stream_chat():
         [f"User: {item['user']}\nBot: {item['bot']}" for item in recent_history]
     )
 
-    # Smarter retrieval query
     if current_topic and history_text.strip():
         retrieval_query = f"""
 Current topic: {current_topic}
@@ -79,15 +64,32 @@ Recent conversation:
     else:
         retrieval_query = user_message
 
-    docs = retriever.invoke(retrieval_query)
-    context = "\n\n".join([doc.page_content for doc in docs])
+    query_embedding = embeddings.embed_query(retrieval_query)
 
+    results = index.query(
+        vector=query_embedding,
+        top_k=6,
+        include_metadata=True
+    )
+
+    matches = results.get("matches", [])
+
+    context_parts = []
     sources = []
-    for doc in docs:
-        source = doc.metadata.get("source", "Unknown source")
+
+    for match in matches:
+        metadata = match.get("metadata", {})
+        text = metadata.get("text", "")
+        source = metadata.get("source", "Unknown source")
         filename = source.split("/")[-1]
+
+        if text:
+            context_parts.append(text)
+
         if filename not in sources:
             sources.append(filename)
+
+    context = "\n\n".join(context_parts)
 
     topic_prompt = f"""
 Detect the main medical topic.
