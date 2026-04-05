@@ -1,6 +1,7 @@
-venv/
+*.pdf
+data/
+data_backup/
 .env
+venv/
 __pycache__/
 *.pyc
-data_backup/
-*.pdf
