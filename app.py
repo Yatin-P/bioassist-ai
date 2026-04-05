@@ -4,7 +4,9 @@ import os
 
 from pinecone import Pinecone
 from pinecone import Pinecone
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings()
 from openai import OpenAI
 
 app = Flask(__name__)
