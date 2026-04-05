@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 
 from pinecone import Pinecone
-from langchain_pinecone import PineconeVectorStore
+from pinecone import Pinecone
 from langchain_huggingface import HuggingFaceEmbeddings
 from openai import OpenAI
 
