@@ -1,11 +1,10 @@
 flask
+gunicorn
 openai
+pinecone-client
+langchain==0.1.16
+langchain-community==0.0.32
+langchain-openai==0.0.8
 python-dotenv
-pinecone
-langchain
-langchain-community
-langchain-pinecone
-langchain-huggingface
-sentence-transformers
+tiktoken
 pypdf
-gunicorn==23.0.0
