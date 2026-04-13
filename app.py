@@ -17,6 +17,7 @@ from flask import (
 from langchain_openai import OpenAIEmbeddings
 from openai import OpenAI
 from pinecone import Pinecone
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.secret_key = "bioassist_secret_key"
@@ -26,14 +27,55 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-APP_USERNAME = os.getenv("BIOASSIST_USERNAME", "admin")
-APP_PASSWORD = os.getenv("BIOASSIST_PASSWORD", "bioassist123")
+USER_DB_PATH = os.getenv("BIOASSIST_USER_DB", "users.db")
+
+USERS_TABLE_DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(INDEX_NAME)
+
+
+def initialize_auth_storage():
+    with sqlite3.connect(USER_DB_PATH) as conn:
+        conn.execute(USERS_TABLE_DDL)
+        conn.commit()
+
+
+def fetch_user(username):
+    initialize_auth_storage()
+    normalized_username = username.strip()
+    with sqlite3.connect(USER_DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        user = conn.execute(
+            "SELECT id, username, password_hash FROM users WHERE username = ?",
+            (normalized_username,),
+        ).fetchone()
+    return user
+
+
+def register_user(username, password):
+    initialize_auth_storage()
+    normalized_username = username.strip()
+    password_hash = generate_password_hash(password)
+    try:
+        with sqlite3.connect(USER_DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                (normalized_username, password_hash),
+            )
+            conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
 
 
 def login_required(view_func):
@@ -46,6 +88,36 @@ def login_required(view_func):
     return wrapped
 
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if session.get("logged_in"):
+        return redirect(url_for("index_page"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if len(username) < 3:
+            flash("Username must be at least 3 characters.")
+            return render_template("register.html")
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.")
+            return render_template("register.html")
+        if password != confirm_password:
+            flash("Passwords do not match.")
+            return render_template("register.html")
+
+        if not register_user(username, password):
+            flash("That username is already taken.")
+            return render_template("register.html")
+
+        flash("Registration successful. Please log in.")
+        return redirect(url_for("login"))
+
+    return render_template("register.html")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("logged_in"):
@@ -54,11 +126,12 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        user = fetch_user(username)
 
-        if username == APP_USERNAME and password == APP_PASSWORD:
+        if user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["logged_in"] = True
-            session["username"] = username
+            session["username"] = user["username"]
             session["chat_history"] = []
             session["current_topic"] = ""
             return redirect(url_for("index_page"))
@@ -250,7 +323,7 @@ def clear_chat():
     return "Chat cleared"
 
 
-init_user_db()
+initialize_auth_storage()
 
 
 if __name__ == "__main__":
