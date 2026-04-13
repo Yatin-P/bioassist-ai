@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioAssist AI - Register</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #dbeafe, #f5d0fe, #fae8ff);
+            font-family: Arial, sans-serif;
+            padding: 24px;
+        }
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 20px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.15);
+            padding: 28px;
+        }
+        h1 {
+            margin: 0 0 10px;
+            color: #1e293b;
+            font-size: 30px;
+        }
+        p {
+            margin: 0 0 20px;
+            color: #475569;
+            line-height: 1.5;
+        }
+        .message {
+            margin-bottom: 14px;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 1px solid #fecaca;
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            color: #334155;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 13px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            font-size: 15px;
+        }
+        button {
+            width: 100%;
+            border: none;
+            margin-top: 18px;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            background: linear-gradient(135deg, #2563eb, #9333ea);
+        }
+        .auth-link {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #334155;
+            text-align: center;
+        }
+        .auth-link a {
+            color: #2563eb;
+            font-weight: 700;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🧠 BioAssist AI</h1>
+        <p>Create an account to start using your medical document assistant.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/register">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" minlength="3" required>
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" minlength="6" required>
+
+            <label for="confirm_password">Confirm Password</label>
+            <input id="confirm_password" name="confirm_password" type="password" minlength="6" required>
+
+            <button type="submit">Create Account</button>
+        </form>
+
+        <div class="auth-link">Already have an account? <a href="/login">Log in</a></div>
+    </div>
+</body>
+</html>
