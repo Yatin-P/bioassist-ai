@@ -1,10 +1,26 @@
-from flask import Flask, render_template, request, session, Response, stream_with_context
-from dotenv import load_dotenv
+from functools import wraps
 import os
+import sqlite3
+import time
 
-from pinecone import Pinecone
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    Response,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    stream_with_context,
+    url_for,
+)
 from langchain_openai import OpenAIEmbeddings
 from openai import OpenAI
+from pinecone import Pinecone
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from pypdf import PdfReader
 
 app = Flask(__name__)
 app.secret_key = "bioassist_secret_key"
@@ -14,29 +30,201 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+USER_DB_PATH = os.getenv("BIOASSIST_USER_DB", "users.db")
+UPLOAD_FOLDER = os.getenv("BIOASSIST_UPLOAD_DIR", "uploaded_docs")
+MAX_UPLOAD_CHARS = 20000
+
+USERS_TABLE_DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(INDEX_NAME)
 
 
+def initialize_auth_storage():
+    with sqlite3.connect(USER_DB_PATH) as conn:
+        conn.execute(USERS_TABLE_DDL)
+        conn.commit()
+
+
+def initialize_upload_storage():
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def extract_document_text(file_storage):
+    filename = file_storage.filename or ""
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if extension in {"txt", "md"}:
+        text = file_storage.read().decode("utf-8", errors="ignore")
+    elif extension == "pdf":
+        reader = PdfReader(file_storage)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    else:
+        return None
+
+    cleaned = " ".join(text.split())
+    return cleaned[:MAX_UPLOAD_CHARS].strip()
+
+
+def fetch_user(username):
+    initialize_auth_storage()
+    normalized_username = username.strip()
+    with sqlite3.connect(USER_DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        user = conn.execute(
+            "SELECT id, username, password_hash FROM users WHERE username = ?",
+            (normalized_username,),
+        ).fetchone()
+    return user
+
+
+def register_user(username, password):
+    initialize_auth_storage()
+    normalized_username = username.strip()
+    password_hash = generate_password_hash(password)
+    try:
+        with sqlite3.connect(USER_DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+                (normalized_username, password_hash),
+            )
+            conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return view_func(*args, **kwargs)
+
+    return wrapped
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if session.get("logged_in"):
+        return redirect(url_for("index_page"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if len(username) < 3:
+            flash("Username must be at least 3 characters.")
+            return render_template("register.html")
+        if len(password) < 6:
+            flash("Password must be at least 6 characters.")
+            return render_template("register.html")
+        if password != confirm_password:
+            flash("Passwords do not match.")
+            return render_template("register.html")
+
+        if not register_user(username, password):
+            flash("That username is already taken.")
+            return render_template("register.html")
+
+        flash("Registration successful. Please log in.")
+        return redirect(url_for("login"))
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("index_page"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        user = fetch_user(username)
+
+        if user and check_password_hash(user["password_hash"], password):
+            session.clear()
+            session["logged_in"] = True
+            session["username"] = user["username"]
+            session["chat_history"] = []
+            session["current_topic"] = ""
+            return redirect(url_for("index_page"))
+
+        flash("Invalid username or password.")
+
+    return render_template("login.html")
+
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/upload-document", methods=["POST"])
+@login_required
+def upload_document():
+    if "document" not in request.files:
+        return "No file selected.", 400
+
+    file = request.files["document"]
+    if not file or not file.filename:
+        return "No file selected.", 400
+
+    text = extract_document_text(file)
+    if not text:
+        return "Unsupported or empty file. Use PDF, TXT, or MD.", 400
+
+    username = session.get("username", "user")
+    safe_name = secure_filename(file.filename)
+    saved_filename = f"{username}_{int(time.time())}_{safe_name}.txt"
+    saved_path = os.path.join(UPLOAD_FOLDER, saved_filename)
+
+    with open(saved_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    session["uploaded_doc_name"] = safe_name
+    session["uploaded_doc_path"] = saved_path
+
+    return f"Attached document: {safe_name}"
+
+
 @app.route("/")
+@login_required
 def index_page():
     if "chat_history" not in session:
         session["chat_history"] = []
     if "current_topic" not in session:
         session["current_topic"] = ""
-    return render_template("chat.html")
+    return render_template("chat.html", username=session.get("username", "User"))
 
 
 @app.route("/get", methods=["POST"])
+@login_required
 def stream_chat():
     user_message = request.form["msg"]
 
     chat_history = session.get("chat_history", [])
     current_topic = session.get("current_topic", "")
+    uploaded_doc_name = session.get("uploaded_doc_name", "")
+    uploaded_doc_path = session.get("uploaded_doc_path", "")
+    uploaded_doc_context = ""
+
+    if uploaded_doc_path and os.path.exists(uploaded_doc_path):
+        with open(uploaded_doc_path, "r", encoding="utf-8") as f:
+            uploaded_doc_context = f.read(MAX_UPLOAD_CHARS)
 
     recent_history = chat_history[-4:]
     history_text = "\n".join(
@@ -66,11 +254,7 @@ Recent conversation:
 
     query_embedding = embeddings.embed_query(retrieval_query)
 
-    results = index.query(
-        vector=query_embedding,
-        top_k=6,
-        include_metadata=True
-    )
+    results = index.query(vector=query_embedding, top_k=6, include_metadata=True)
 
     matches = results.get("matches", [])
 
@@ -103,10 +287,7 @@ Question:
 Return only topic name.
 """
 
-    topic_response = client.responses.create(
-        model="gpt-5-nano",
-        input=topic_prompt
-    )
+    topic_response = client.responses.create(model="gpt-5-nano", input=topic_prompt)
 
     detected_topic = topic_response.output_text.strip()
     if detected_topic:
@@ -169,6 +350,9 @@ Recent Conversation:
 Context:
 {context}
 
+Attached Document ({uploaded_doc_name}):
+{uploaded_doc_context}
+
 Question:
 {user_message}
 """
@@ -176,10 +360,7 @@ Question:
     def generate():
         final_answer = ""
 
-        with client.responses.stream(
-            model="gpt-5-nano",
-            input=prompt
-        ) as stream:
+        with client.responses.stream(model="gpt-5-nano", input=prompt) as stream:
             for event in stream:
                 if event.type == "response.output_text.delta":
                     chunk = event.delta
@@ -191,20 +372,22 @@ Question:
             final_answer += source_text
             yield source_text
 
-        chat_history.append({
-            "user": user_message,
-            "bot": final_answer
-        })
+        chat_history.append({"user": user_message, "bot": final_answer})
         session["chat_history"] = chat_history[-10:]
 
     return Response(stream_with_context(generate()), mimetype="text/plain")
 
 
 @app.route("/clear", methods=["POST"])
+@login_required
 def clear_chat():
     session["chat_history"] = []
     session["current_topic"] = ""
     return "Chat cleared"
+
+
+initialize_auth_storage()
+initialize_upload_storage()
 
 
 if __name__ == "__main__":
