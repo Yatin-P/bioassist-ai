@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioAssist AI - Login</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #dbeafe, #f5d0fe, #fae8ff);
+            font-family: Arial, sans-serif;
+            padding: 24px;
+        }
+        .card {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 20px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.15);
+            padding: 28px;
+        }
+        h1 {
+            margin: 0 0 10px;
+            color: #1e293b;
+            font-size: 30px;
+        }
+        p {
+            margin: 0 0 20px;
+            color: #475569;
+            line-height: 1.5;
+        }
+        .error {
+            margin-bottom: 14px;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-size: 14px;
+            border: 1px solid #fecaca;
+        }
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            color: #334155;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px 13px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            font-size: 15px;
+        }
+        button {
+            width: 100%;
+            border: none;
+            margin-top: 18px;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            background: linear-gradient(135deg, #2563eb, #9333ea);
+        }
+        .hint {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🧠 BioAssist AI</h1>
+        <p>Log in to access your medical document assistant.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="error">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login">
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" required>
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" required>
+
+            <button type="submit">Log In</button>
+        </form>
+
+        <div class="hint">Set <strong>BIOASSIST_USERNAME</strong> and <strong>BIOASSIST_PASSWORD</strong> in your <code>.env</code> file to customize credentials.</div>
+    </div>
+</body>
+</html>

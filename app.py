@@ -1,10 +1,21 @@
-from flask import Flask, render_template, request, session, Response, stream_with_context
-from dotenv import load_dotenv
+from functools import wraps
 import os
 
-from pinecone import Pinecone
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    Response,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    stream_with_context,
+    url_for,
+)
 from langchain_openai import OpenAIEmbeddings
 from openai import OpenAI
+from pinecone import Pinecone
 
 app = Flask(__name__)
 app.secret_key = "bioassist_secret_key"
@@ -14,6 +25,8 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+APP_USERNAME = os.getenv("BIOASSIST_USERNAME", "admin")
+APP_PASSWORD = os.getenv("BIOASSIST_PASSWORD", "bioassist123")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
@@ -22,16 +35,57 @@ pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(INDEX_NAME)
 
 
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return view_func(*args, **kwargs)
+
+    return wrapped
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect(url_for("index_page"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if username == APP_USERNAME and password == APP_PASSWORD:
+            session.clear()
+            session["logged_in"] = True
+            session["username"] = username
+            session["chat_history"] = []
+            session["current_topic"] = ""
+            return redirect(url_for("index_page"))
+
+        flash("Invalid username or password.")
+
+    return render_template("login.html")
+
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index_page():
     if "chat_history" not in session:
         session["chat_history"] = []
     if "current_topic" not in session:
         session["current_topic"] = ""
-    return render_template("chat.html")
+    return render_template("chat.html", username=session.get("username", "User"))
 
 
 @app.route("/get", methods=["POST"])
+@login_required
 def stream_chat():
     user_message = request.form["msg"]
 
@@ -66,11 +120,7 @@ Recent conversation:
 
     query_embedding = embeddings.embed_query(retrieval_query)
 
-    results = index.query(
-        vector=query_embedding,
-        top_k=6,
-        include_metadata=True
-    )
+    results = index.query(vector=query_embedding, top_k=6, include_metadata=True)
 
     matches = results.get("matches", [])
 
@@ -103,10 +153,7 @@ Question:
 Return only topic name.
 """
 
-    topic_response = client.responses.create(
-        model="gpt-5-nano",
-        input=topic_prompt
-    )
+    topic_response = client.responses.create(model="gpt-5-nano", input=topic_prompt)
 
     detected_topic = topic_response.output_text.strip()
     if detected_topic:
@@ -176,10 +223,7 @@ Question:
     def generate():
         final_answer = ""
 
-        with client.responses.stream(
-            model="gpt-5-nano",
-            input=prompt
-        ) as stream:
+        with client.responses.stream(model="gpt-5-nano", input=prompt) as stream:
             for event in stream:
                 if event.type == "response.output_text.delta":
                     chunk = event.delta
@@ -191,16 +235,14 @@ Question:
             final_answer += source_text
             yield source_text
 
-        chat_history.append({
-            "user": user_message,
-            "bot": final_answer
-        })
+        chat_history.append({"user": user_message, "bot": final_answer})
         session["chat_history"] = chat_history[-10:]
 
     return Response(stream_with_context(generate()), mimetype="text/plain")
 
 
 @app.route("/clear", methods=["POST"])
+@login_required
 def clear_chat():
     session["chat_history"] = []
     session["current_topic"] = ""
