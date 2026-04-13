@@ -111,6 +111,7 @@
         .header-actions {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .header-btn {
@@ -127,6 +128,13 @@
 
         .header-btn:hover {
             background: rgba(255, 255, 255, 0.24);
+        }
+
+        .upload-status {
+            font-size: 12px;
+            opacity: 0.95;
+            margin-top: 6px;
+            color: #e2e8f0;
         }
 
         #chatbox {
@@ -194,9 +202,56 @@
         .input-area {
             display: flex;
             gap: 12px;
+            flex-wrap: wrap;
             padding: 18px 20px;
             background: white;
             border-top: 1px solid #e5e7eb;
+        }
+
+        .composer-row {
+            width: 100%;
+            display: flex;
+            gap: 10px;
+        }
+
+        .attach-btn {
+            border: 1px solid #cbd5e1;
+            background: white;
+            color: #334155;
+            border-radius: 14px;
+            width: 46px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .attached-files {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .file-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #eef2ff;
+            color: #3730a3;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .file-chip button {
+            border: none;
+            background: transparent;
+            color: #3730a3;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
         }
 
         #userInput {
@@ -360,11 +415,15 @@
             <div class="header">
                 <div class="header-left">
                     <h1>Medical Chat Assistant</h1>
-                    <p>ChatGPT-style medical document assistant</p>
+                    <p>ChatGPT-style medical document assistant · Logged in as {{ username }}</p>
                 </div>
                 <div class="header-actions">
                     <button class="header-btn" onclick="clearChat()">Clear Chat</button>
+                    <form method="POST" action="/logout" style="margin:0;">
+                        <button type="submit" class="header-btn">Log Out</button>
+                    </form>
                 </div>
+                <div id="uploadStatus" class="upload-status"></div>
             </div>
 
             <div id="chatbox">
@@ -379,8 +438,13 @@
             </div>
 
             <div class="input-area">
-                <input type="text" id="userInput" placeholder="Ask a medical question...">
-                <button id="sendBtn">Send</button>
+                <div id="attachedFiles" class="attached-files"></div>
+                <div class="composer-row">
+                    <input id="docInput" type="file" accept=".pdf,.txt,.md" style="display:none;">
+                    <button id="attachBtn" class="attach-btn" type="button" title="Attach file">📎</button>
+                    <input type="text" id="userInput" placeholder="Ask a medical question...">
+                    <button id="sendBtn">Send</button>
+                </div>
             </div>
         </div>
     </div>
@@ -389,6 +453,10 @@
         const sendBtn = document.getElementById("sendBtn");
         const userInput = document.getElementById("userInput");
         const chatbox = document.getElementById("chatbox");
+        const uploadStatus = document.getElementById("uploadStatus");
+        const docInput = document.getElementById("docInput");
+        const attachBtn = document.getElementById("attachBtn");
+        const attachedFiles = document.getElementById("attachedFiles");
 
         function escapeHtml(text) {
             const div = document.createElement("div");
@@ -528,6 +596,67 @@
                 });
         }
 
+        function renderAttachedFiles(documents) {
+            attachedFiles.innerHTML = "";
+            documents.forEach(doc => {
+                const chip = document.createElement("div");
+                chip.className = "file-chip";
+                chip.innerHTML = `<span>${doc.name}</span><button type="button" aria-label="Remove file">✕</button>`;
+
+                chip.querySelector("button").addEventListener("click", () => removeDocument(doc.name));
+                attachedFiles.appendChild(chip);
+            });
+        }
+
+        function uploadDocument() {
+            const file = docInput.files[0];
+            if (!file) {
+                uploadStatus.textContent = "Please choose a file first.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("document", file);
+
+            uploadStatus.textContent = "Uploading document...";
+
+            fetch("/upload-document", {
+                method: "POST",
+                body: formData
+            })
+            .then(async response => {
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.message || "Upload failed");
+                uploadStatus.textContent = payload.message;
+                renderAttachedFiles(payload.documents || []);
+                docInput.value = "";
+            })
+            .catch(error => {
+                uploadStatus.textContent = error.message || "Document upload failed.";
+            });
+        }
+
+        function removeDocument(name) {
+            const data = new URLSearchParams();
+            data.append("name", name);
+
+            fetch("/remove-document", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: data.toString()
+            })
+            .then(response => response.json())
+            .then(payload => {
+                renderAttachedFiles(payload.documents || []);
+                uploadStatus.textContent = `${name} removed.`;
+            })
+            .catch(() => {
+                uploadStatus.textContent = "Failed to remove file.";
+            });
+        }
+
 
     function sendMessage() {
     const message = userInput.value.trim();
@@ -561,6 +690,8 @@
 }
 
         sendBtn.addEventListener("click", sendMessage);
+        attachBtn.addEventListener("click", () => docInput.click());
+        docInput.addEventListener("change", uploadDocument);
         userInput.addEventListener("keypress", function(event) {
             if (event.key === "Enter") {
                 sendMessage();

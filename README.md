@@ -1,8 +1,10 @@
 # BioAssist AI
 
-BioAssist AI is a medical document question-answering chatbot built with Flask, Pinecone, Hugging Face embeddings, and OpenAI.
+BioAssist AI is a medical document question-answering chatbot built with Flask, Pinecone, embeddings, and OpenAI.
 
 ## Features
+- User registration, login, and logout authentication
+- Upload/attach files (PDF, TXT, MD) from the chat composer (ChatGPT-style paperclip flow)
 - Ask questions from a medical PDF
 - Store document embeddings in Pinecone
 - Retrieve relevant document chunks
@@ -15,13 +17,15 @@ BioAssist AI is a medical document question-answering chatbot built with Flask, 
 - Pinecone
 - OpenAI
 - LangChain
-- Hugging Face Embeddings
+- SQLite (for user authentication)
 
 ## Project Structure
 - `app.py` - main Flask application
 - `store_index.py` - indexes PDF data into Pinecone
 - `src/helper.py` - PDF loading, chunking, embeddings
 - `src/prompt.py` - prompt template
+- `templates/login.html` - login page
+- `templates/register.html` - registration page
 - `templates/chat.html` - frontend chat UI
 
 ## Setup
@@ -35,7 +39,15 @@ BioAssist AI is a medical document question-answering chatbot built with Flask, 
 - `PINECONE_API_KEY`
 - `PINECONE_INDEX_NAME`
 - `OPENAI_API_KEY`
+- `BIOASSIST_USER_DB` (optional, default: `users.db`)
+- `BIOASSIST_UPLOAD_DIR` (optional, default: `uploaded_docs`)
 
 ## Run
 ```bash
 python app.py
+```
+
+Then:
+1. Open the app.
+2. Register a new user account.
+3. Log in with your new credentials.
