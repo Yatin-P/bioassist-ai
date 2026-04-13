@@ -1,5 +1,6 @@
 from functools import wraps
 import os
+import sqlite3
 
 from dotenv import load_dotenv
 from flask import (
@@ -247,6 +248,9 @@ def clear_chat():
     session["chat_history"] = []
     session["current_topic"] = ""
     return "Chat cleared"
+
+
+init_user_db()
 
 
 if __name__ == "__main__":
