@@ -380,6 +380,9 @@ Recent Conversation:
 Context (includes attached docs when available):
 {context}
 
+Attached Documents:
+{attached_doc_context}
+
 Question:
 {user_message}
 """

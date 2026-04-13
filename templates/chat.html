@@ -418,6 +418,10 @@
                     <p>ChatGPT-style medical document assistant · Logged in as {{ username }}</p>
                 </div>
                 <div class="header-actions">
+                    <form class="upload-form" onsubmit="uploadDocument(event)">
+                        <input id="docInput" class="upload-input" type="file" accept=".pdf,.txt,.md" required>
+                        <button type="submit" class="header-btn">Attach File</button>
+                    </form>
                     <button class="header-btn" onclick="clearChat()">Clear Chat</button>
                     <form method="POST" action="/logout" style="margin:0;">
                         <button type="submit" class="header-btn">Log Out</button>
