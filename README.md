@@ -4,6 +4,7 @@ BioAssist AI is a medical document question-answering chatbot built with Flask, 
 
 ## Features
 - User registration, login, and logout authentication
+- Upload/attach a document (PDF, TXT, MD) and ask questions from it in chat
 - Ask questions from a medical PDF
 - Store document embeddings in Pinecone
 - Retrieve relevant document chunks
@@ -39,6 +40,7 @@ BioAssist AI is a medical document question-answering chatbot built with Flask, 
 - `PINECONE_INDEX_NAME`
 - `OPENAI_API_KEY`
 - `BIOASSIST_USER_DB` (optional, default: `users.db`)
+- `BIOASSIST_UPLOAD_DIR` (optional, default: `uploaded_docs`)
 
 ## Run
 ```bash

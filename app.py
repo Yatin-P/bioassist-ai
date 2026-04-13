@@ -1,6 +1,7 @@
 from functools import wraps
 import os
 import sqlite3
+import time
 
 from dotenv import load_dotenv
 from flask import (
@@ -18,6 +19,8 @@ from langchain_openai import OpenAIEmbeddings
 from openai import OpenAI
 from pinecone import Pinecone
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from pypdf import PdfReader
 
 app = Flask(__name__)
 app.secret_key = "bioassist_secret_key"
@@ -28,6 +31,8 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 USER_DB_PATH = os.getenv("BIOASSIST_USER_DB", "users.db")
+UPLOAD_FOLDER = os.getenv("BIOASSIST_UPLOAD_DIR", "uploaded_docs")
+MAX_UPLOAD_CHARS = 20000
 
 USERS_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS users (
@@ -48,6 +53,26 @@ def initialize_auth_storage():
     with sqlite3.connect(USER_DB_PATH) as conn:
         conn.execute(USERS_TABLE_DDL)
         conn.commit()
+
+
+def initialize_upload_storage():
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def extract_document_text(file_storage):
+    filename = file_storage.filename or ""
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if extension in {"txt", "md"}:
+        text = file_storage.read().decode("utf-8", errors="ignore")
+    elif extension == "pdf":
+        reader = PdfReader(file_storage)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    else:
+        return None
+
+    cleaned = " ".join(text.split())
+    return cleaned[:MAX_UPLOAD_CHARS].strip()
 
 
 def fetch_user(username):
@@ -148,6 +173,34 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/upload-document", methods=["POST"])
+@login_required
+def upload_document():
+    if "document" not in request.files:
+        return "No file selected.", 400
+
+    file = request.files["document"]
+    if not file or not file.filename:
+        return "No file selected.", 400
+
+    text = extract_document_text(file)
+    if not text:
+        return "Unsupported or empty file. Use PDF, TXT, or MD.", 400
+
+    username = session.get("username", "user")
+    safe_name = secure_filename(file.filename)
+    saved_filename = f"{username}_{int(time.time())}_{safe_name}.txt"
+    saved_path = os.path.join(UPLOAD_FOLDER, saved_filename)
+
+    with open(saved_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    session["uploaded_doc_name"] = safe_name
+    session["uploaded_doc_path"] = saved_path
+
+    return f"Attached document: {safe_name}"
+
+
 @app.route("/")
 @login_required
 def index_page():
@@ -165,6 +218,13 @@ def stream_chat():
 
     chat_history = session.get("chat_history", [])
     current_topic = session.get("current_topic", "")
+    uploaded_doc_name = session.get("uploaded_doc_name", "")
+    uploaded_doc_path = session.get("uploaded_doc_path", "")
+    uploaded_doc_context = ""
+
+    if uploaded_doc_path and os.path.exists(uploaded_doc_path):
+        with open(uploaded_doc_path, "r", encoding="utf-8") as f:
+            uploaded_doc_context = f.read(MAX_UPLOAD_CHARS)
 
     recent_history = chat_history[-4:]
     history_text = "\n".join(
@@ -290,6 +350,9 @@ Recent Conversation:
 Context:
 {context}
 
+Attached Document ({uploaded_doc_name}):
+{uploaded_doc_context}
+
 Question:
 {user_message}
 """
@@ -324,6 +387,7 @@ def clear_chat():
 
 
 initialize_auth_storage()
+initialize_upload_storage()
 
 
 if __name__ == "__main__":
