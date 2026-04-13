@@ -278,26 +278,28 @@ Recent conversation:
     else:
         retrieval_query = user_message
 
-    query_embedding = embeddings.embed_query(retrieval_query)
-
-    results = index.query(vector=query_embedding, top_k=6, include_metadata=True)
-
-    matches = results.get("matches", [])
-
     context_parts = []
     sources = []
 
-    for match in matches:
-        metadata = match.get("metadata", {})
-        text = metadata.get("text", "")
-        source = metadata.get("source", "Unknown source")
-        filename = source.split("/")[-1]
+    if attached_doc_context.strip():
+        context_parts.append(attached_doc_context)
+        sources.extend([doc.get("name", "attached_document") for doc in attached_documents])
+    else:
+        query_embedding = embeddings.embed_query(retrieval_query)
+        results = index.query(vector=query_embedding, top_k=6, include_metadata=True)
+        matches = results.get("matches", [])
 
-        if text:
-            context_parts.append(text)
+        for match in matches:
+            metadata = match.get("metadata", {})
+            text = metadata.get("text", "")
+            source = metadata.get("source", "Unknown source")
+            filename = source.split("/")[-1]
 
-        if filename not in sources:
-            sources.append(filename)
+            if text:
+                context_parts.append(text)
+
+            if filename not in sources:
+                sources.append(filename)
 
     context = "\n\n".join(context_parts)
 
@@ -325,6 +327,7 @@ You are BioAssist AI, a smart and helpful medical study assistant.
 
 Your job:
 - Prioritize attached documents first when answering.
+- If attached documents are present, answer from them directly.
 - Answer only from the provided context and recent conversation.
 - Use the current topic to understand follow-up questions.
 - Do not guess.
@@ -374,7 +377,7 @@ Current Topic:
 Recent Conversation:
 {history_text}
 
-Context:
+Context (includes attached docs when available):
 {context}
 
 Attached Documents:
