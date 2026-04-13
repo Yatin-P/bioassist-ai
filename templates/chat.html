@@ -360,10 +360,13 @@
             <div class="header">
                 <div class="header-left">
                     <h1>Medical Chat Assistant</h1>
-                    <p>ChatGPT-style medical document assistant</p>
+                    <p>ChatGPT-style medical document assistant · Logged in as {{ username }}</p>
                 </div>
                 <div class="header-actions">
                     <button class="header-btn" onclick="clearChat()">Clear Chat</button>
+                    <form method="POST" action="/logout" style="margin:0;">
+                        <button type="submit" class="header-btn">Log Out</button>
+                    </form>
                 </div>
             </div>
 
